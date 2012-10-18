@@ -151,7 +151,7 @@ def int_to_bytes(num):
 
 
 def bytes_to_int(bytes):
-    return reduce(lambda a, b: a << 8 | b, map(ord, bytes), 0)
+    return reduce(lambda a, b: a << 8 | b, bytes, 0)
 
 
 class Signer(object):
@@ -388,6 +388,7 @@ class Serializer(object):
         if serializer is None:
             serializer = self.default_serializer
         self.serializer = serializer
+        self.is_bytes_serializer = isinstance(self.serializer.dumps({}), bytes)
         if signer is None:
             signer = self.default_signer
         self.signer = signer
@@ -399,13 +400,12 @@ class Serializer(object):
         valid.
         """
         try:
-            if self.serializer in [
-                    simplejson, compact_json, self.default_serializer]:
-                # From Python 3, json only accepts unicode strings
+            if self.is_bytes_serializer:
+                if isinstance(payload, str):
+                    payload = payload.encode('utf-8')
+            else:
                 if isinstance(payload, bytes):
                     payload = payload.decode('utf-8')
-            elif isinstance(payload, str):
-                payload = payload.encode('utf-8')
             return self.serializer.loads(payload)
         except Exception as e:
             raise BadPayload('Could not load the payload because an '
@@ -510,6 +510,8 @@ class URLSafeSerializerMixin(object):
     """
 
     def load_payload(self, payload):
+        if isinstance(payload, bytes):
+            payload = payload.decode('utf-8')
         decompress = False
         if payload[0] == '.':
             payload = payload[1:]
